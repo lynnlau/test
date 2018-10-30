@@ -1,7 +1,9 @@
-#!/user/python/env
-#
+#!/usr/bin/env 
+# -*- coding: utf-8 -*-
+
 import sys
 ﻿import serial
+import time
 
 def Translate(s):
     tmp = []
@@ -25,20 +27,19 @@ def Translate(s):
     return data,None
 
 def Test(c):
-    global ser
+    global ser,repeat
     ser.write(c)
     while True:
-        if self.ser.inWaiting () == 0:
-            if OUTSTREAM != '':
-                OutFile = open(OutPut,'a')
-                OutFile.write(OUTSTREAM)
-                OutFile.close()
-                OUTSTREAM = ''
+        if ser.inWaiting () == 0:
+            if repeat:
+                ser.write(c)
+                repeat -= 1
             else:
-                pass
+                print('Timeout!')
+                return
         else:
             time.sleep(0.2)
-            data = self.ser.read(ser.inWaiting())
+            data = ser.read(ser.inWaiting())
             data = list(data)
             print('')
             print ('RX:',end=' ')
@@ -80,7 +81,10 @@ if __name__ == '__main__':
             NumofLine += 1
     print(CommandArray)
     for i in CommandArray:
-        Test(i)
+        if Test(i):
+            print('Please press any key to exit')
+            tmp = input()
+            exit()
 
 
 
