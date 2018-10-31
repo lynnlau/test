@@ -1,9 +1,9 @@
-#!/usr/bin/env 
+#!/usr/bin/env
 # -*- coding: utf-8 -*-
 
 import sys
-﻿import serial
 import time
+import serial
 
 def Translate(s):
     tmp = []
@@ -26,29 +26,37 @@ def Translate(s):
         i += 2
     return data,None
 
+
 def Test(c):
     global ser,repeat
     ser.write(c)
+    print("TX:",c)
     while True:
         if ser.inWaiting () == 0:
             if repeat:
                 ser.write(c)
+                print("TX:",c)
                 repeat -= 1
             else:
                 print('Timeout!')
-                return
+                return True
         else:
             time.sleep(0.2)
             data = ser.read(ser.inWaiting())
             data = list(data)
-            print('')
             print ('RX:',end=' ')
+            return None
 
 if __name__ == '__main__':
-    global ser
+    global ser,repeat
+    repeat = 2
 
-    Pare = sys.argv[1]
-    
+    try:
+        Para = sys.argv[1]
+    except:
+        print("Please check the parameter")
+        exit()
+
     ser = serial.Serial()
     ser. parity='E'
     ser.port= '/dev/ttyUSB2'
@@ -56,10 +64,12 @@ if __name__ == '__main__':
         ser.open()
     except BaseException as e:
         print (e)
-        
-    with open('./'+Pare) as file:
+        exit()
+
+    with open('./'+Para) as file:
         NumofLine = 1
         CommandArray = []
+        print('load the command...')
         while True:
             tmp = file.readline()
             if tmp == '':
@@ -77,15 +87,12 @@ if __name__ == '__main__':
                 elif Command == None:
                     pass
                 else:
+                    print('load the line ',NumofLine,Command)
                     CommandArray += [Command]
             NumofLine += 1
-    print(CommandArray)
+
     for i in CommandArray:
         if Test(i):
             print('Please press any key to exit')
             tmp = input()
             exit()
-
-
-
-
