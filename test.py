@@ -5,6 +5,38 @@ import sys
 import time
 import serial
 
+def list2hex(l):
+    t = ['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F']
+    s = ''
+    for i in l:
+        s = t[i>>4]+t[i&0xf]+' '
+
+def Fcs(d):
+    b=0
+    v=0
+    P=0x8408
+    fcstab=[]
+    fcs=0xffff
+    for b in range(0,256):
+        v=b;
+        for i in range(0,8):
+            v = (v >> 1) ^ P if v & 1 else v >> 1
+        fcstab += [v]
+
+    while d:
+        fcs=(fcs >> 8) ^ fcstab[(fcs ^ d[0]) & 0xff]
+        d = d[1:]
+    fcs ^= 0xffff
+    return [fcs&0xff]+[fcs>>8]
+
+def Combine(a):
+    global A
+    tmp = len(a)+len(A)+7
+    C = [0]
+    L = [tmp>>8] + [tmp&0xff]
+    HCS = Fcs(L+C+A)
+    return [0x68]+L+C+A+HCS+a+[0,0]+Fcs(L+C+A+HCS+a+[0,0])+[0x16]
+
 def Translate(s):
     tmp = []
     for i in s:
@@ -26,42 +58,45 @@ def Translate(s):
         i += 2
     return data,None
 
-
 def Test(c):
-    global ser,repeat
-    ser.write(c)
-    print("TX:",c)
-    while True:
-        if ser.inWaiting () == 0:
-            if repeat:
-                ser.write(c)
-                print("TX:",c)
-                repeat -= 1
+    global SER,REPEAT,TIMEOUT   
+    repeat = REPEAT
+    tmp = ''
+    while repeat+1:
+        SER.write(c)
+        tmp += "TX:"+ list2hex(c) + '\n'
+        timeout = TIMEOUT
+        while timeout:
+            if SER.inWaiting () == 0:
+                time.sleep(1)
+                timeout -= 1
             else:
-                print('Timeout!')
-                return True
-        else:
-            time.sleep(0.2)
-            data = ser.read(ser.inWaiting())
-            data = list(data)
-            print ('RX:',end=' ')
-            return None
+                time.sleep(0.2)
+                data = SER.read(SER.inWaiting())
+                data = list(data)
+                tmp += "RX:" + list2hex(data) + '\n'
+                return tmp,None
+        repeat -= 1
+    tmp += 'no responed \n'
+    return None,tmp
+            
 
 if __name__ == '__main__':
-    global ser,repeat
-    repeat = 2
-
+    global SER,REPEAT,TIMEOUT,A
+    A = [17,17,17,17,17,17]
+    REPEAT = 2
+    TIMEOUT = 15
     try:
         Para = sys.argv[1]
     except:
         print("Please check the parameter")
         exit()
 
-    ser = serial.Serial()
-    ser. parity='E'
-    ser.port= '/dev/ttyUSB2'
+    SER = serial.Serial()
+    SER.parity='E'
+    SER.port= '/dev/ttyUSB2'
     try:
-        ser.open()
+        SER.open()
     except BaseException as e:
         print (e)
         exit()
@@ -92,7 +127,10 @@ if __name__ == '__main__':
             NumofLine += 1
 
     for i in CommandArray:
-        if Test(i):
-            print('Please press any key to exit')
+        respones,err = Test(i)
+        if err:
+            print(err,'Please press any key to exit')
             tmp = input()
             exit()
+        else:
+            print(respones)
