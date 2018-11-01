@@ -6,10 +6,11 @@ import time
 import serial
 
 def list2hex(l):
-    t = ['0','1','2','3','4','5','6','7','8','9','A','B','C','D','E','F']
+    t = '0123456789ABCDEF'
     s = ''
     for i in l:
-        s = t[i>>4]+t[i&0xf]+' '
+        s += t[i>>4]+t[i&0xf]+' '
+    return s
 
 def Fcs(d):
     b=0
@@ -31,13 +32,76 @@ def Fcs(d):
 
 def Combine(a):
     global A
-    tmp = len(a)+len(A)+7
-    C = [0]
-    L = [tmp>>8] + [tmp&0xff]
-    HCS = Fcs(L+C+A)
-    return [0x68]+L+C+A+HCS+a+[0,0]+Fcs(L+C+A+HCS+a+[0,0])+[0x16]
+    tmp = len(a)+len(A)+9
+    C = [0x43]
+    SA = [5]
+    CA = [0x10]
+    L = [tmp&0xff] + [tmp>>8] 
+    HCS = Fcs(L+C+SA+A+CA)
+    return [0x68]+L+C+SA+A+CA+HCS+a+Fcs(L+C+SA+A+CA+HCS+a)+[0x16]
+
+def Analyze(d):
+    try:
+        while d[0]!=0x68:
+            d = d[1:]
+    except:
+        return
+    l = d[1]+(d[2]<<8)
+    
+    if len(d) < l+2:
+        return False
+        
+    if d[l+1] != 0x16:
+        return False 
+    '''
+    if fcs16(d[1:l-1]) != d[l-1:l+1]:
+        return False
+    '''
+    addrL = (d[4]&0xf)+1
+    addr = d[4:addrL+5]
+    '''
+    if addr != A:
+        return False
+    '''
+    apdu = d[addrL+8:]
+'''
+建立应用连接响应 [130] CONNECT-Response,
+断开应用连接响应 [131] RELEASE-Response,
+断开应用连接通知 [132] RELEASE-Notification,
+读取响应 [133] GET-Response,
+设置响应 [134] SET-Response,
+操作响应 [135] ACTION-Response,
+上报通知 [136] REPORT-Notification,
+代理响应 [137] PROXY-Response,
+异常响应 [238] ERROR-Response
+'''
+    if apdu[0] == 133:
+        pass
+    elif  apdu[0] == 134: #SET-Response
+    elif  apdu[0] == 135: #ACTION-Response
+        pass
+    elif  apdu[0] == :
+        pass
+    elif  apdu[0] == :
+        pass
+    else:
+        pass
+        
+    print(apdu)
 
 def Translate(s):
+    i = 0
+    while s[i]==' ':
+        i+=1
+    s = s[i:]
+    
+    if s[:4] == 'wait':
+        return s,None
+    elif s[:5] == 'judge':
+        return s,None
+    else:
+        pass
+        
     tmp = []
     for i in s:
         if i == ' ':
@@ -59,12 +123,37 @@ def Translate(s):
     return data,None
 
 def Test(c):
+    global DATA
+    if not c:
+        return None,None
+    if c[:4] == 'wait':
+        wait=''
+        c=c[4:]
+        i = 0
+        while c[i:]:
+            if c[i] in '1234567890':
+                wait += c[i]
+            i += 1
+        wait = int(wait)
+        while wait:
+            sys.stdout.write(' wait {0}s\r'.format(wait))
+            sys.stdout.flush()
+            time.sleep(1)
+            wait -= 1
+            sys.stdout.write(' ' * 10 + '\r')
+        return 'end the waiting',None
+
+    elif c[:5] == 'judge':
+        return s,None
+    else:
+        pass
+
     global SER,REPEAT,TIMEOUT   
     repeat = REPEAT
-    tmp = ''
+    SData = Combine(c)
     while repeat+1:
-        SER.write(c)
-        tmp += "TX:"+ list2hex(c) + '\n'
+        SER.write(SData)
+        print(time.time(),"TX:"+ list2hex(SData))
         timeout = TIMEOUT
         while timeout:
             if SER.inWaiting () == 0:
@@ -72,35 +161,39 @@ def Test(c):
                 timeout -= 1
             else:
                 time.sleep(0.2)
-                data = SER.read(SER.inWaiting())
-                data = list(data)
-                tmp += "RX:" + list2hex(data) + '\n'
-                return tmp,None
+                RData = SER.read(SER.inWaiting())
+                RData = list(RData)
+                print(time.time(),"RX:" + list2hex(RData))
+                result,data = Analyze(RDate)
+                if result:
+                    DATA = data
+                    return result,None
+                else:
+                    return None,data 
         repeat -= 1
-    tmp += 'no responed \n'
-    return None,tmp
-            
+    return None,'no responed \n'
+
 
 if __name__ == '__main__':
     global SER,REPEAT,TIMEOUT,A
     A = [17,17,17,17,17,17]
     REPEAT = 2
     TIMEOUT = 15
-    try:
-        Para = sys.argv[1]
-    except:
-        print("Please check the parameter")
-        exit()
 
     SER = serial.Serial()
     SER.parity='E'
-    SER.port= '/dev/ttyUSB2'
+    SER.port= '/dev/ttyUSB0'
     try:
         SER.open()
     except BaseException as e:
         print (e)
         exit()
-
+    try:
+        open('./CommadTask') as file:
+    except:
+        print('')
+        exit()
+    
     with open('./'+Para) as file:
         NumofLine = 1
         CommandArray = []
@@ -122,10 +215,19 @@ if __name__ == '__main__':
                 elif Command == None:
                     pass
                 else:
-                    print('load the line ',NumofLine,Command)
-                    CommandArray += [Command]
+                    try:
+                        print('load the line',NumofLine,':',list2hex(Command))
+                        CommandArray += [Command]
+                    except:
+                        print('load the line',NumofLine,':',Command,end='')
+                        CommandArray += [Command]
             NumofLine += 1
-
+    
+    print('loading is completed!')
+    print('''
+    
+    ''')
+    
     for i in CommandArray:
         respones,err = Test(i)
         if err:
