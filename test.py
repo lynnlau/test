@@ -94,14 +94,7 @@ def Translate(s):
     while s[i]==' ':
         i+=1
     s = s[i:]
-    
-    if s[:4] == 'wait':
-        return s,None
-    elif s[:5] == 'judge':
-        return s,None
-    else:
-        pass
-        
+
     tmp = []
     for i in s:
         if i == ' ':
@@ -112,9 +105,9 @@ def Translate(s):
             try:
                 tmp += [int(i,16)]
             except BaseException as err:
-                return None , err
+                return s , None
     if len(tmp)%2:
-        return None,'The larg of command is incorrect'
+        return None,'The larg of APDU is incorrect'
     data = []
     i = 0
     while tmp[i:i+2]:
@@ -124,54 +117,59 @@ def Translate(s):
 
 def Test(c):
     global DATA
-    if not c:
-        return None,None
-    if c[:4] == 'wait':
-        wait=''
-        c=c[4:]
-        i = 0
-        while c[i:]:
-            if c[i] in '1234567890':
-                wait += c[i]
-            i += 1
-        wait = int(wait)
-        while wait:
-            sys.stdout.write(' wait {0}s\r'.format(wait))
-            sys.stdout.flush()
-            time.sleep(1)
-            wait -= 1
-            sys.stdout.write(' ' * 10 + '\r')
-        return 'end the waiting',None
-
-    elif c[:5] == 'judge':
-        return s,None
-    else:
-        pass
-
-    global SER,REPEAT,TIMEOUT   
-    repeat = REPEAT
-    SData = Combine(c)
-    while repeat+1:
-        SER.write(SData)
-        print(time.time(),"TX:"+ list2hex(SData))
-        timeout = TIMEOUT
-        while timeout:
-            if SER.inWaiting () == 0:
-                time.sleep(1)
-                timeout -= 1
-            else:
-                time.sleep(0.2)
-                RData = SER.read(SER.inWaiting())
-                RData = list(RData)
-                print(time.time(),"RX:" + list2hex(RData))
-                result,data = Analyze(RDate)
-                if result:
-                    DATA = data
-                    return result,None
+    if isinstance(c,list):
+        global SER,REPEAT,TIMEOUT   
+        repeat = REPEAT
+        SData = Combine(c)
+        while repeat+1:
+            SER.write(SData)
+            print(time.time(),"TX:"+ list2hex(SData))
+            timeout = TIMEOUT
+            while timeout:
+                if SER.inWaiting () == 0:
+                    time.sleep(1)
+                    timeout -= 1
                 else:
-                    return None,data 
-        repeat -= 1
-    return None,'no responed \n'
+                    time.sleep(0.2)
+                    RData = SER.read(SER.inWaiting())
+                    RData = list(RData)
+                    print(time.time(),"RX:" + list2hex(RData))
+                    result,data = Analyze(RDate)
+                    if result:
+                        DATA = data
+                        print(result)
+                        return result,None
+                    else:
+                        return None,data 
+            repeat -= 1
+        return None,'no responed \n'
+    else: 
+        if not c:
+            return None,None
+        if c[:4] == 'wait':
+            wait=''
+            c=c[4:]
+            i = 0
+            while c[i:]:
+                if c[i] in '1234567890':
+                    wait += c[i]
+                i += 1
+            wait = int(wait)
+            tmp = 'wait '+wait+' s\n'
+            while wait:
+                sys.stdout.write(' wait {0}s\r'.format(wait))
+                sys.stdout.flush()
+                time.sleep(1)
+                wait -= 1
+                sys.stdout.write(' ' * 10 + '\r')
+            tmp += 'end the waiting'
+            return tmp,None
+
+        elif c[:5] == 'judge':
+            return s,None
+        else:
+            pass
+
 
 
 if __name__ == '__main__':
