@@ -91,88 +91,97 @@ def Analyze(d):
         
     print(apdu)
 
-def Translate(s):
-    i = 0
-    while s[i]==' ':
-        i+=1
-    s = s[i:]
-
-    tmp = []
-    for i in s:
-        if i == ' ':
+def Translate(file):
+    NumofLine = 0
+    CommandArray = []
+    while True:
+        NumofLine += 1
+        tmp = file.readline()
+        while tmp[0] == ' ':
+            tmp = tmp[1:]
+        if tmp[:5] in ['wait','judge','report','测试目的：','预期结果：']:
+            CommandArray += [tmp]
+        elif tmp == '\n':
             pass
-        elif i == '\n':
+        elif tmp =='':
             break
         else:
-            try:
-                tmp += [int(i,16)]
-            except BaseException as err:
-                return s , None
-    if len(tmp)%2:
-        return None,'The larg of APDU is incorrect'
-    data = []
-    i = 0
-    while tmp[i:i+2]:
-        data += [(tmp[i]<<4)+tmp[i+1]]
-        i += 2
-    return data,None
-
-def Test(c):
-    global DATA
-    if isinstance(c,list):
-        global SER,REPEAT,TIMEOUT   
-        repeat = REPEAT
-        SData = Combine(c)
-        while repeat+1:
-            SER.write(SData)
-            print(time.time(),"TX:"+ list2hex(SData))
-            timeout = TIMEOUT
-            while timeout:
-                if SER.inWaiting () == 0:
-                    time.sleep(1)
-                    timeout -= 1
+            l = []
+            for i in tmp:
+                if i == ' ':
+                    pass
+                elif i == '\n':
+                    break
                 else:
-                    time.sleep(0.2)
-                    RData = SER.read(SER.inWaiting())
-                    RData = list(RData)
-                    print(time.time(),"RX:" + list2hex(RData))
-                    result,data = Analyze(RDate)
-                    if result:
-                        DATA = data
-                        print(result)
-                        return result,None
+                    try:
+                        l += [int(i,16)]
+                        CommandArray += [l]
+                    except BaseException as err:
+                        return None, 'line '+str(NumofLine) + ' some err!'
+            if len(l)%2:
+                return None,'line'+str(NumofLine)+'The larg of APDU is incorrect'
+            else:
+                return [CommandArray],None
+def log (d):
+    print(d)
+    
+def Test(a):
+    global DATA
+    for i in a:
+        log(i[0])
+        i = i[1:]
+        for j in i:
+            for c in j:
+                if isinstance(c,list):
+                    global SER,REPEAT,TIMEOUT   
+                    repeat = REPEAT
+                    SData = Combine(c)
+                    while repeat+1:
+                        SER.write(SData)
+                        print(time.time(),"TX:"+ list2hex(SData))
+                        timeout = TIMEOUT
+                        while timeout:
+                            if SER.inWaiting () == 0:
+                                time.sleep(1)
+                                timeout -= 1
+                            else:
+                                time.sleep(0.2)
+                                RData = SER.read(SER.inWaiting())
+                                RData = list(RData)
+                                print(time.time(),"RX:" + list2hex(RData))
+                                result,data = Analyze(RDate)
+                                if result:
+                                    DATA = data
+                                    print(result)
+                                    return result,None
+                                else:
+                                    return None,data 
+                        repeat -= 1
+                    return None,'no responed \n'
+                else: 
+                    if c[:4] == 'wait':
+                        wait='' 
+                        c=c[4:]
+                        i = 0
+                        while c[i:]:
+                            if c[i] in '1234567890':
+                                wait += c[i]
+                            i += 1
+                        wait = int(wait)
+                        tmp = 'wait '+wait+' s\n'
+                        while wait:
+                            sys.stdout.write(' wait {0}s\r'.format(wait))
+                            sys.stdout.flush()
+                            time.sleep(1)
+                            wait -= 1
+                            sys.stdout.write(' ' * 10 + '\r')
+                        tmp += 'end the waiting'
+                        return tmp,None
+
+                    elif c[:5] == 'judge':
+                        return s,None
                     else:
-                        return None,data 
-            repeat -= 1
-        return None,'no responed \n'
-    else: 
-        if not c:
-            return None,None
-        if c[:4] == 'wait':
-            wait=''                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
-            c=c[4:]
-            i = 0
-            while c[i:]:
-                if c[i] in '1234567890':
-                    wait += c[i]
-                i += 1
-            wait = int(wait)
-            tmp = 'wait '+wait+' s\n'
-            while wait:
-                sys.stdout.write(' wait {0}s\r'.format(wait))
-                sys.stdout.flush()
-                time.sleep(1)
-                wait -= 1
-                sys.stdout.write(' ' * 10 + '\r')
-            tmp += 'end the waiting'
-            return tmp,None
-
-        elif c[:5] == 'judge':
-            return s,None
-        else:
-            pass
-
-
+                        pass
 
 if __name__ == '__main__':
     global SER,REPEAT,TIMEOUT,A
@@ -182,7 +191,7 @@ if __name__ == '__main__':
 ####开串口####
     SER = serial.Serial()
     SER.parity='E'
-    SER.port= '/dev/ttyUSB0'
+    SER.port= '/dev/ttyUSB2'
     try:
         SER.open()
     except BaseException as e:
@@ -191,70 +200,38 @@ if __name__ == '__main__':
 
 ####打开测试清单####
     conf = configparser.ConfigParser()
-    print('file_path :',file_path)
-    conf.read(file_path)
+    conf.read('example.ini')
 
-    sections = conf.sections()
-    print('获取配置文件所有的section', sections)
-
-    options = conf.options('mysql')
+    projectes = conf.sections()
+    print('获取配置文件所有的section', projectes)
+    '''
+    options = conf.options(sections[0])
     print('获取指定section下所有option', options)
 
 
-    items = conf.items('mysql')
+    items = conf.items(sections[0])
     print('获取指定section下所有的键值对', items)
 
-
-    value = conf.get('mysql', 'host')
+    value = conf.get(sections[0],'1')
     print('获取指定的section下的option', type(value), value)
-
     '''
-    try:
-        open('./CommadTask') as file:
-    except:
-        print('')
-        exit()
-    
-    with open('./'+Para) as file:
-        NumofLine = 1
-        CommandArray = []
-        print('load the command...')
-        while True:
-            tmp = file.readline()
-            if tmp == '':
-                break
-            elif tmp =='\n':
-                pass
-            else:
-                Command ,err = Translate(tmp)
+    ProjectList = []
+    for project in projectes:
+        P = [project]
+        items = conf.options(project)
+        for item in items:
+            with open(project+'/'+conf.get(project,item)) as file:
+                print('load the command >>',project,'>>',conf.get(project,item))
+                command,err = Translate(file)
                 if err:
-                    print('line',NumofLine,': invalid command in identifier')
-                    print('information:',err)
-                    print('Please press any key to exit')
-                    tmp = input()
+                    print('in',project,'>>',conf.get(project,item))
+                    print(err)
                     exit()
-                elif Command == None:
-                    pass
                 else:
-                    try:
-                        print('load the line',NumofLine,':',list2hex(Command))
-                        CommandArray += [Command]
-                    except:
-                        print('load the line',NumofLine,':',Command,end='')
-                        CommandArray += [Command]
-            NumofLine += 1
-    
-    print('loading is completed!')
-    print('''
-    
-    ''')
-    
-    for i in CommandArray:
-        respones,err = Test(i)
-        if err:
-            print(err,'Please press any key to exit')
-            tmp = input()
-            exit()
-        else:
-            print(respones)
-    '''
+                    P += command
+        ProjectList += [P]
+    print(ProjectList)
+    print(len(ProjectList))
+    print(len(ProjectList[0]))
+    Test(ProjectList)
+   
