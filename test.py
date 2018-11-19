@@ -6,6 +6,11 @@ import time
 import serial
 import configparser
 
+class FunModule():
+    def __init__(self,name):
+        self.name = name
+        self.items = []
+
 def list2hex(l):
     t = '0123456789ABCDEF'
     s = ''
@@ -91,7 +96,7 @@ def Analyze(d):
         
     print(apdu)
 
-def Translate(file):
+def Check(file):
     NumofLine = 0
     CommandArray = []
     while True:
@@ -122,66 +127,110 @@ def Translate(file):
                 return None,'line'+str(NumofLine)+'The larg of APDU is incorrect'
             else:
                 return [CommandArray],None
-def log (d):
-    print(d)
-    
-def Test(a):
-    global DATA
-    for i in a:
-        log(i[0])
-        i = i[1:]
-        for j in i:
-            for c in j:
-                if isinstance(c,list):
-                    global SER,REPEAT,TIMEOUT   
-                    repeat = REPEAT
-                    SData = Combine(c)
-                    while repeat+1:
-                        SER.write(SData)
-                        print(time.time(),"TX:"+ list2hex(SData))
-                        timeout = TIMEOUT
-                        while timeout:
-                            if SER.inWaiting () == 0:
-                                time.sleep(1)
-                                timeout -= 1
-                            else:
-                                time.sleep(0.2)
-                                RData = SER.read(SER.inWaiting())
-                                RData = list(RData)
-                                print(time.time(),"RX:" + list2hex(RData))
-                                result,data = Analyze(RDate)
-                                if result:
-                                    DATA = data
-                                    print(result)
-                                    return result,None
-                                else:
-                                    return None,data 
-                        repeat -= 1
-                    return None,'no responed \n'
-                else: 
-                    if c[:4] == 'wait':
-                        wait='' 
-                        c=c[4:]
-                        i = 0
-                        while c[i:]:
-                            if c[i] in '1234567890':
-                                wait += c[i]
-                            i += 1
-                        wait = int(wait)
-                        tmp = 'wait '+wait+' s\n'
-                        while wait:
-                            sys.stdout.write(' wait {0}s\r'.format(wait))
-                            sys.stdout.flush()
-                            time.sleep(1)
-                            wait -= 1
-                            sys.stdout.write(' ' * 10 + '\r')
-                        tmp += 'end the waiting'
-                        return tmp,None
 
-                    elif c[:5] == 'judge':
-                        return s,None
-                    else:
-                        pass
+
+def log (m,f=None):
+    print(m)
+    if f:
+        with open(fun+'/'+i,'a') as file:
+            file.write( m )
+            file.close()
+
+
+def Translate(c):
+    return '未解析\n'
+
+def Exe(f):
+    for m in f:
+        fun = m.name
+        log(fun)
+        items = m.items
+        for i in items:
+            try:
+                file = open(fun+'/'+i)
+            except BaseException as err:
+                print(err)
+                exit()
+
+            command,err = Check(file)
+            file.close()
+            if err:
+                print('in',fun,'>>',i)
+                print(err)
+                exit()
+            else:
+                m,err = Test(command)
+                if err:
+                    print(err)
+                    s = input()
+                    exit()
+                else:
+                    log(m)
+            
+
+def Send(m):
+    global SER,REPEAT,TIMEOUT   
+    repeat = REPEAT
+    SData = Combine(m)
+    while repeat+1:
+        SER.write(SData)
+        print(time.time(),"TX:"+ list2hex(SData))
+        timeout = TIMEOUT
+        while timeout:
+            if SER.inWaiting () == 0:
+                time.sleep(1)
+                timeout -= 1
+            else:
+                time.sleep(0.2)
+                RData = SER.read(SER.inWaiting())
+                RData = list(RData)
+                print(time.time(),"RX:" + list2hex(RData))
+                result,data = Analyze(RDate)
+                if result:
+                    DATA = data
+                    print(result)
+                    return result,None
+                else:
+                    return None
+        repeat -= 1
+    return 1
+
+def Test(l):
+    log=''
+    for c in l:
+        if isinstance(c,list):
+            if Send(c):
+                log += Translate(c) + '通信超时'
+                return log,'通信超时'
+            else:
+                log += Translate(c)
+        else: 
+            if c[:4] == 'wait':
+                wait='' 
+                c=c[4:]
+                i = 0
+                while c[i:]:
+                    if c[i] in '1234567890':
+                        wait += c[i]
+                    i += 1
+                wait = int(wait)
+                tmp = 'wait '+wait+' s\n'
+                while wait:
+                    sys.stdout.write(' wait {0}s\r'.format(wait))
+                    sys.stdout.flush()
+                    time.sleep(1)
+                    wait -= 1
+                    sys.stdout.write(' ' * 10 + '\r')
+                tmp += 'end the waiting'
+                log += '等待' + wait + '秒\n'
+
+            elif c[:5] == 'judge':
+                log += '判断'
+            elif c[:5] == 'report':
+                log += 'raport'
+            else:
+                pass
+    return log,None
 
 if __name__ == '__main__':
     global SER,REPEAT,TIMEOUT,A
@@ -191,7 +240,7 @@ if __name__ == '__main__':
 ####开串口####
     SER = serial.Serial()
     SER.parity='E'
-    SER.port= '/dev/ttyUSB2'
+    SER.port= '/dev/ttyUSB0'
     try:
         SER.open()
     except BaseException as e:
@@ -202,24 +251,24 @@ if __name__ == '__main__':
     conf = configparser.ConfigParser()
     conf.read('example.ini')
 
-    projectes = conf.sections()
-    print('获取配置文件所有的section', projectes)
+    FunModules = conf.sections()
+   #print('获取配置文件所有的section', projectes)
     '''
     options = conf.options(sections[0])
     print('获取指定section下所有option', options)
-
-
     items = conf.items(sections[0])
     print('获取指定section下所有的键值对', items)
 
     value = conf.get(sections[0],'1')
     print('获取指定的section下的option', type(value), value)
     '''
-    ProjectList = []
-    for project in projectes:
-        P = [project]
-        items = conf.options(project)
+    FunModuleList = []
+    for Fun in FunModules:
+        f = FunModule(Fun)
+        items = conf.options(Fun)
         for item in items:
+            f.items += [conf.get(Fun,item)]
+            '''
             with open(project+'/'+conf.get(project,item)) as file:
                 print('load the command >>',project,'>>',conf.get(project,item))
                 command,err = Translate(file)
@@ -229,9 +278,7 @@ if __name__ == '__main__':
                     exit()
                 else:
                     P += command
-        ProjectList += [P]
-    print(ProjectList)
-    print(len(ProjectList))
-    print(len(ProjectList[0]))
-    Test(ProjectList)
-   
+             '''
+        FunModuleList += [f]
+    Exe(FunModuleList)
+
