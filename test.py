@@ -1,10 +1,7 @@
 #!/usr/bin/env
 # -*- coding: utf-8 -*-
 
-import sys
-import time
-import serial
-import configparser
+import sys,os,time,serial,configparser,re
 
 class FunModule():
     def __init__(self,name):
@@ -42,7 +39,7 @@ def Combine(a):
     C = [0x43]
     SA = [5]
     CA = [0x10]
-    L = [tmp&0xff] + [tmp>>8] 
+    L = [tmp&0xff] + [tmp>>8]
     HCS = Fcs(L+C+SA+A+CA)
     return [0x68]+L+C+SA+A+CA+HCS+a+Fcs(L+C+SA+A+CA+HCS+a)+[0x16]
 
@@ -53,12 +50,12 @@ def Analyze(d):
     except:
         return
     l = d[1]+(d[2]<<8)
-    
+
     if len(d) < l+2:
         return False
-        
+
     if d[l+1] != 0x16:
-        return False 
+        return False
     '''
     if fcs16(d[1:l-1]) != d[l-1:l+1]:
         return False
@@ -93,7 +90,7 @@ def Analyze(d):
         pass
     else:
         pass
-        
+
     print(apdu)
 
 def Check(file):
@@ -102,74 +99,48 @@ def Check(file):
     while True:
         NumofLine += 1
         tmp = file.readline()
+        if not tmp:
+            return CommandArray,None
         while tmp[0] == ' ':
             tmp = tmp[1:]
-        if tmp[:5] in ['wait','judge','report','测试目的：','预期结果：']:
+        if tmp[:5] in ['wait ','judge','report','测试目的：','预期结果：']:
             CommandArray += [tmp]
         elif tmp == '\n':
             pass
         elif tmp =='':
             break
         else:
-            l = []
+            l = ''
             for i in tmp:
-                if i == ' ':
+                if i ==' ':
                     pass
                 elif i == '\n':
                     break
+                elif i not in '1234567890abcdefABCDEF':
+                    return None,'line'+str(NumofLine)+'The content of APDU is incorrect'
                 else:
-                    try:
-                        l += [int(i,16)]
-                        CommandArray += [l]
-                    except BaseException as err:
-                        return None, 'line '+str(NumofLine) + ' some err!'
+                    l += i
             if len(l)%2:
                 return None,'line'+str(NumofLine)+'The larg of APDU is incorrect'
             else:
-                return [CommandArray],None
+                tmp = []
+                while l:
+                    tmp += [int(l[:2],16)]
+                    l = l[2:]
+                CommandArray += [tmp]
+    return CommandArray,None
 
 
-def log (m,f=None):
+def compose (m,f=None):
     print(m)
     if f:
-        with open(fun+'/'+i,'a') as file:
+        with open(f,'a') as file:
             file.write( m )
             file.close()
 
 
-def Translate(c):
-    return '未解析\n'
-
-def Exe(f):
-    for m in f:
-        fun = m.name
-        log(fun)
-        items = m.items
-        for i in items:
-            try:
-                file = open(fun+'/'+i)
-            except BaseException as err:
-                print(err)
-                exit()
-
-            command,err = Check(file)
-            file.close()
-            if err:
-                print('in',fun,'>>',i)
-                print(err)
-                exit()
-            else:
-                m,err = Test(command)
-                if err:
-                    print(err)
-                    s = input()
-                    exit()
-                else:
-                    log(m)
-            
-
 def Send(m):
-    global SER,REPEAT,TIMEOUT   
+    global SER,REPEAT,TIMEOUT
     repeat = REPEAT
     SData = Combine(m)
     while repeat+1:
@@ -185,28 +156,30 @@ def Send(m):
                 RData = SER.read(SER.inWaiting())
                 RData = list(RData)
                 print(time.time(),"RX:" + list2hex(RData))
-                result,data = Analyze(RDate)
-                if result:
-                    DATA = data
-                    print(result)
-                    return result,None
-                else:
-                    return None
+                return RData,None
+        #print(SER.read(1024))
         repeat -= 1
-    return 1
+    return None,1
+
+def Translate(c):
+    return '未解析\n'
+
+def judge(c):
+    if re.match('\s+ok\s+',c):
+        return 
 
 def Test(l):
     log=''
     for c in l:
         if isinstance(c,list):
-            if Send(c):
-                log += Translate(c) + '通信超时'
+            log += Translate(c)
+            rdata,err=Send(c)
+            if err:
+                log +=  '通信超时'
                 return log,'通信超时'
-            else:
-                log += Translate(c)
-        else: 
+        else:
             if c[:4] == 'wait':
-                wait='' 
+                wait=''
                 c=c[4:]
                 i = 0
                 while c[i:]:
@@ -214,33 +187,86 @@ def Test(l):
                         wait += c[i]
                     i += 1
                 wait = int(wait)
-                tmp = 'wait '+wait+' s\n'
+                log += '等待' + str(wait) + '秒\n'
                 while wait:
                     sys.stdout.write(' wait {0}s\r'.format(wait))
                     sys.stdout.flush()
                     time.sleep(1)
                     wait -= 1
                     sys.stdout.write(' ' * 10 + '\r')
-                tmp += 'end the waiting'
-                log += '等待' + wait + '秒\n'
+
 
             elif c[:5] == 'judge':
                 log += '判断'
+
             elif c[:5] == 'report':
                 log += 'raport'
+            elif c[:4] == '测试目的':
+                log += c
+            elif c[:4] == '预期结果':
+                log += c
             else:
                 pass
     return log,None
 
+def Exe(f):
+    for m in f:
+        funname = m.name
+        compose(funname)
+        items = m.items
+        for i in items:
+            try:
+                file = open(funname+'/'+i)
+            except BaseException as err:
+                print(err)
+                exit()
+
+            command,err = Check(file)
+            file.close()
+            if err:
+                print('in',funname,'>>',i)
+                print(err)
+                exit()
+            else:
+                compose(i)
+                m,err = Test(command)
+                if err:
+                    print(err)
+                    print(m)
+                    s = input()
+                    exit()
+                else:
+                    compose(m)
+
+
 if __name__ == '__main__':
     global SER,REPEAT,TIMEOUT,A
     A = [17,17,17,17,17,17]
-    REPEAT = 2
-    TIMEOUT = 15
+    REPEAT = 1
+    TIMEOUT = 10
 ####开串口####
+    l = os.popen("ls /dev |grep ttyUSB").read()
+    tmp = ''
+    array = []
+    for i in l:
+        if i == '\n':
+            array += [tmp]
+            tmp = ''
+        else:
+            tmp += i
+    tmp = 0
+    l = ''
+    for i in array:
+        print(tmp,': ',i)
+        l+=str(tmp)
+        tmp += 1
+    i = input('Please change the num of serial: ')
+    while i not in l:
+        i = input('Please rechange the num of serial: ')
+    print( array[int(i)])
     SER = serial.Serial()
     SER.parity='E'
-    SER.port= '/dev/ttyUSB0'
+    SER.port= '/dev/'+array[int(i)]#'/dev/ttyUSB0'
     try:
         SER.open()
     except BaseException as e:
@@ -281,4 +307,3 @@ if __name__ == '__main__':
              '''
         FunModuleList += [f]
     Exe(FunModuleList)
-

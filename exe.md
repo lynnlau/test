@@ -18,6 +18,4 @@ test--测试错误-->end1
 test--该item测试完成-->rname
 r--读完-->end1(结束)
 
-
-
 ```
