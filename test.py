@@ -43,55 +43,7 @@ def Combine(a):
     HCS = Fcs(L+C+SA+A+CA)
     return [0x68]+L+C+SA+A+CA+HCS+a+Fcs(L+C+SA+A+CA+HCS+a)+[0x16]
 
-def Analyze(d):
-    try:
-        while d[0]!=0x68:
-            d = d[1:]
-    except:
-        return
-    l = d[1]+(d[2]<<8)
 
-    if len(d) < l+2:
-        return False
-
-    if d[l+1] != 0x16:
-        return False
-    '''
-    if fcs16(d[1:l-1]) != d[l-1:l+1]:
-        return False
-    '''
-    addrL = (d[4]&0xf)+1
-    addr = d[4:addrL+5]
-    '''
-    if addr != A:
-        return False
-    '''
-    apdu = d[addrL+8:]
-    '''
-    建立应用连接响应 [130] CONNECT-Response,
-    断开应用连接响应 [131] RELEASE-Response,
-    断开应用连接通知 [132] RELEASE-Notification,
-    读取响应 [133] GET-Response,
-    设置响应 [134] SET-Response,
-    操作响应 [135] ACTION-Response,
-    上报通知 [136] REPORT-Notification,
-    代理响应 [137] PROXY-Response,
-    异常响应 [238] ERROR-Response
-'''
-    if  apdu[0] == 133:
-        pass
-    elif  apdu[0] == 134: #SET-Response
-        pass
-    elif  apdu[0] == 135: #ACTION-Response
-        pass
-    elif  apdu[0] == 0:
-        pass
-    elif  apdu[0] == 0:
-        pass
-    else:
-        pass
-
-    print(apdu)
 
 def Check(file):
     NumofLine = 0
@@ -164,9 +116,44 @@ def Send(m):
 def Translate(c):
     return '未解析\n'
 
-def judge(c):
+def judge(d,p,c,r):
+    '''
     if re.match('\s+ok\s+',c):
-        return 
+        return
+    '''
+
+    l=[]
+    tmp=''
+    while p:
+        if p[0]!='.':
+            tmp+=p[0]:
+            p=p[1:]
+        else:
+            l+=[int(tmp)]
+            tmp=''
+            p=p[1:]
+    try:
+        for i in p:
+            d = d[i]
+    except:
+        return False
+    if isinstance(d,int) or isinstance(d,flaot):
+        r = float(r)
+    else:
+        return d == r
+
+    if c=='<':
+        return d < r
+    elif c=='>':
+        return d > r
+    elif c=='=':
+        return d == r
+    elif c=='<=':
+        return d <= r
+    elif c=='>=':
+        return d >= r
+    else:
+        return False
 
 def Test(l):
     log=''
@@ -177,6 +164,8 @@ def Test(l):
             if err:
                 log +=  '通信超时'
                 return log,'通信超时'
+            else:
+                data = Analyze(rdata)
         else:
             if c[:4] == 'wait':
                 wait=''
@@ -195,10 +184,23 @@ def Test(l):
                     wait -= 1
                     sys.stdout.write(' ' * 10 + '\r')
 
-
             elif c[:5] == 'judge':
                 log += '判断'
-
+                c=[5:]
+                p,condition,r = ''
+                while c[0] !=',':
+                    p+=c[0]
+                    c=c[1:]
+                c=c[1:]
+                while c[0] !=',':
+                    condition+=c[0]
+                    c=c[1:]
+                c=c[1:]
+                while c:
+                    r+=c[0]
+                    c=c[1:]
+                if judge(data,p,condition,r):
+                    return log,'测试失败'
             elif c[:5] == 'report':
                 log += 'raport'
             elif c[:4] == '测试目的':
