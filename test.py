@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import sys,os,time,serial,configparser,re
+from oop import *
 
 class FunModule():
     def __init__(self,name):
@@ -126,7 +127,7 @@ def judge(d,p,c,r):
     tmp=''
     while p:
         if p[0]!='.':
-            tmp+=p[0]:
+            tmp+=p[0]
             p=p[1:]
         else:
             l+=[int(tmp)]
@@ -186,7 +187,7 @@ def Test(l):
 
             elif c[:5] == 'judge':
                 log += '判断'
-                c=[5:]
+                c=c[5:]
                 p,condition,r = ''
                 while c[0] !=',':
                     p+=c[0]
